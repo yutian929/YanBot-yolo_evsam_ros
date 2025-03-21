@@ -15,6 +15,7 @@ from efficientvit.sam_model_zoo import create_efficientvit_sam_model
 from efficientvit.models.efficientvit.sam import EfficientViTSamPredictor
 
 
+
 class VitDetectionServer(object):
     def __init__(self, model_path, sam_checkpoint, sam_model, box_threshold=0.1, text_threshold=0.3):
         torch.cuda.empty_cache()
@@ -44,6 +45,9 @@ class VitDetectionServer(object):
     def segment(self, image: np.ndarray, xyxy: np.ndarray) -> np.ndarray:
         self.sam_predictor.set_image(image)
         result_masks = []
+
+        
+
         for box in xyxy:
             masks, scores, logits = self.sam_predictor.predict(
                 box=box,
@@ -51,6 +55,7 @@ class VitDetectionServer(object):
             )
             index = np.argmax(scores)
             result_masks.append(masks[index])
+
         return np.array(result_masks)
     
     def detect(self, image, class_list):
@@ -65,10 +70,18 @@ class VitDetectionServer(object):
         labels = [results[0].names[int(cls)] for cls in results[0].boxes.cls]
 
         # Segment 
+
+        start_time = rospy.Time.now()
+        
         detections.mask = self.segment(
             image=cv2.cvtColor(image, cv2.COLOR_BGR2RGB),
             xyxy=results[0].boxes.xyxy.cpu().numpy()
         )
+
+        end_time = rospy.Time.now()
+
+        seg_time = (end_time - start_time).to_sec()
+        rospy.loginfo(f"seg time: {seg_time:.3f} seconds")
 
         # annotate image with detections
         box_annotator = sv.BoxAnnotator()
