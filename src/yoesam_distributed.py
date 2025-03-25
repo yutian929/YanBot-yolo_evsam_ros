@@ -65,15 +65,18 @@ class DetectSegmentation:
         self.yolo_world_model.set_classes(class_list)
         results = self.yolo_world_model.predict(source=image, conf=self.box_threshold)
 
-        if results[0].boxes == None:
+        if results[0].boxes is None or len(results[0].boxes) == 0:
             rospy.set_param("det_seg_processing", False)
             return
 
+        # 生成class_id
+        class_id = results[0].boxes.cls.cpu().numpy().astype(int).tolist()
         # 生成标签列表
         labels = [results[0].names[int(cls)] for cls in results[0].boxes.cls]
-
         # 获取边界框列表
         boxes = results[0].boxes.xyxy.cpu().numpy()
+
+        print(boxes)
 
         # 获取置信度列表
         scores = results[0].boxes.conf.cpu().numpy()
@@ -89,8 +92,8 @@ class DetectSegmentation:
         # 将 N 张 H×W 的掩码图转换为 单个 H×W×N 的多通道 Image 消息
         masks_stacked = np.stack(masks, axis=-1)  # 变成 (H, W, N)
 
-        print(masks.shape)
-        print(masks_stacked.shape)
+        # print(masks.shape)
+        # print(masks_stacked.shape)
         
 
         # end_time = rospy.Time.now()
@@ -101,10 +104,15 @@ class DetectSegmentation:
         # 发布图像标注信息
         annotation_info = AnnotationInfo()
         annotation_info.header.stamp = time_stamp
+        annotation_info.class_id = class_id
         annotation_info.labels = labels
         annotation_info.boxes.layout.dim = [MultiArrayDimension(label="boxes", size=boxes.shape[0], stride=4)]
         annotation_info.boxes.data = boxes.flatten().tolist()
         self.annotation_info_pub.publish(annotation_info)
+
+        # 测试消息发布到接收的时间
+        current_time = rospy.Time.now()
+        rospy.set_param("/current_time", current_time.to_sec()) # 以秒级浮点数存储
 
         # 发布掩码信息
         mask_info = MaskInfo()
@@ -113,6 +121,9 @@ class DetectSegmentation:
         mask_info.scores = scores.tolist()
         mask_info.segmasks = self.cv_bridge.cv2_to_imgmsg(masks_stacked, encoding="passthrough")  # 8 位无符号整数，N 通道
         self.mask_info_pub.publish(mask_info)
+
+        
+
 
         end_time = rospy.Time.now()
         seg_time = (end_time - start_time).to_sec()*1000
