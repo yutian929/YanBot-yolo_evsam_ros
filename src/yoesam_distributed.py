@@ -55,16 +55,17 @@ class DetectSegmentation:
 
         # 提取图像时间戳，将图像消息转化为np数组形式
         time_stamp = image_msg.header.stamp
-        image = self.cv_bridge.imgmsg_to_cv2(image_msg)
+        image = self.cv_bridge.imgmsg_to_cv2(image_msg, "bgr8")
 
         # 从参数服务器获取检测类型（检测提示词）
         class_list = rospy.get_param("detection_prompt")
+        # print(class_list)
 
         # 检测目标
-        # start_time = rospy.Time.now()
         self.yolo_world_model.set_classes(class_list)
         results = self.yolo_world_model.predict(source=image, conf=self.box_threshold)
 
+        # 如果未检测到目标，直接退出程序
         if results[0].boxes is None or len(results[0].boxes) == 0:
             rospy.set_param("det_seg_processing", False)
             return
@@ -75,9 +76,6 @@ class DetectSegmentation:
         labels = [results[0].names[int(cls)] for cls in results[0].boxes.cls]
         # 获取边界框列表
         boxes = results[0].boxes.xyxy.cpu().numpy()
-
-        print(boxes)
-
         # 获取置信度列表
         scores = results[0].boxes.conf.cpu().numpy()
 
@@ -89,17 +87,9 @@ class DetectSegmentation:
         )
         masks = masks.astype(np.uint8)  # True -> 1, False -> 0
         # masks = (masks.astype(np.uint8)) * 255  # True -> 255(白色), False -> 0(黑色)
+        
         # 将 N 张 H×W 的掩码图转换为 单个 H×W×N 的多通道 Image 消息
         masks_stacked = np.stack(masks, axis=-1)  # 变成 (H, W, N)
-
-        # print(masks.shape)
-        # print(masks_stacked.shape)
-        
-
-        # end_time = rospy.Time.now()
-        # seg_time = (end_time - start_time).to_sec()*1000
-        # rospy.loginfo(f"detect+segment time: {seg_time:.1f} ms")
-        # rospy.loginfo(f"seg time: {seg_time:.1f} ms")
 
         # 发布图像标注信息
         annotation_info = AnnotationInfo()
@@ -122,9 +112,7 @@ class DetectSegmentation:
         mask_info.segmasks = self.cv_bridge.cv2_to_imgmsg(masks_stacked, encoding="passthrough")  # 8 位无符号整数，N 通道
         self.mask_info_pub.publish(mask_info)
 
-        
-
-
+        # 测量检测分割的时间
         end_time = rospy.Time.now()
         seg_time = (end_time - start_time).to_sec()*1000
         rospy.loginfo(f"detect+segment time: {seg_time:.1f} ms")
@@ -154,13 +142,10 @@ class DetectSegmentation:
 if __name__ == '__main__':
     rospy.init_node('yolo_evsam_ros')
 
-    # get arguments from the ros parameter server
-    model_path = rospy.get_param('~model_path')
-    # config = rospy.get_param('~config')
+    model_path = rospy.get_param('~yolo_model_path')
     sam_checkpoint = rospy.get_param('~sam_checkpoint')
     sam_model = rospy.get_param('~sam_model')
     box_threshold = rospy.get_param('~box_threshold')
 
-    # start the server
     DetectSegmentation(model_path, sam_checkpoint, sam_model, box_threshold)
     rospy.spin()

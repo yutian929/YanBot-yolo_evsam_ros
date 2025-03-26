@@ -4,7 +4,7 @@
   <env name="LD_PRELOAD" value="/usr/lib/x86_64-linux-gnu/libffi.so.7" />
 
   <!-- Get arguments -->
-  <arg name="model_path" default="$(find yolo_evsam_ros)/weights/yolov8l-worldv2.pt" doc="Detection Model Path [default: weights/yolov8l-worldv2.pt]" />
+  <arg name="yolo_model_path" default="$(find yolo_evsam_ros)/weights/yolov8l-worldv2.pt" doc="Detection Model Path [default: weights/yolov8l-worldv2.pt]" />
   <!-- <arg name="config" default="$(find yolo_evsam_ros)/config/GroundingDINO_SwinT_OGC.py" doc="Config path [default: src/groundingdino/config/GroundingDINO_SwinT_OGC.py]" /> -->
   <arg name="sam_model" default="efficientvit-sam-l2" doc="Can be either efficientvit-sam-l0, efficientvit-sam-l1 or efficientvit-sam-l2."/>
   <arg name="box_threshold" default="0.2" doc="Min confidence threshold for box." />
@@ -20,7 +20,7 @@
 
   <!-- Run Contact-GraspNet -->
   <node name="yolo_evsam_ros" pkg="yolo_evsam_ros" type="yoesam_distributed.py" launch-prefix = "$(arg venv)" output="screen" >
-      <param name="model_path" type="str" value="$(arg model_path)" />
+      <param name="yolo_model_path" type="str" value="$(arg yolo_model_path)" />
       <!-- <param name="config" type="str" value="$(arg config)" /> -->
       <param name="sam_checkpoint" type="str" value="$(arg sam_checkpoint)" />
       <param name="sam_model" type="str" value="$(arg sam_model)" />
