@@ -7,7 +7,7 @@
   <arg name="yolo_model_path" default="$(find yolo_evsam_ros)/weights/yolov8l-worldv2.pt" doc="Detection Model Path [default: weights/yolov8l-worldv2.pt]" />
   <!-- <arg name="config" default="$(find yolo_evsam_ros)/config/GroundingDINO_SwinT_OGC.py" doc="Config path [default: src/groundingdino/config/GroundingDINO_SwinT_OGC.py]" /> -->
   <arg name="sam_model" default="efficientvit-sam-l2" doc="Can be either efficientvit-sam-l0, efficientvit-sam-l1 or efficientvit-sam-l2."/>
-  <arg name="box_threshold" default="0.2" doc="Min confidence threshold for box." />
+  <arg name="box_threshold" default="0.4" doc="Min confidence threshold for box." />
   <arg name="text_threshold" default="0.3" doc="Min confidence threshold for text." />
   <!-- <arg name="default_prompt" default="keyboard. mouse. cellphone. earphone. laptop. computer. water bottle. plant. keys. door. chair." doc="Default prompt for grounding. end with ." /> -->
 
