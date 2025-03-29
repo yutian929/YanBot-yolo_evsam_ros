@@ -1,21 +1,17 @@
 import rospy
 from cv_bridge import CvBridge
-from yolo_evsam_ros.srv import VitDetection, VitDetectionResponse
 from std_msgs.msg import MultiArrayDimension
 
 import cv2
 import numpy as np
-
 import torch
-import supervision as sv
 
 from ultralytics import YOLO
 
 from efficientvit.sam_model_zoo import create_efficientvit_sam_model
 from efficientvit.models.efficientvit.sam import EfficientViTSamPredictor
 
-from sensor_msgs.msg import Image, CameraInfo
-from std_msgs.msg import Bool
+from sensor_msgs.msg import Image
 from yolo_evsam_ros.msg import AnnotationInfo, MaskInfo
 
 class DetectSegmentation:
@@ -35,9 +31,6 @@ class DetectSegmentation:
         self.mask_info_pub = rospy.Publisher("mask_info", MaskInfo, queue_size=1)
 
         self.cv_bridge = CvBridge()
-
-        # # 模型加载完成消息 发布者
-        # init_pub = rospy.Publisher("/yolo_evsam_ros_init", Bool, queue_size=1)
 
         rospy.loginfo("Loading yolo evsam models...")
 
@@ -74,6 +67,7 @@ class DetectSegmentation:
 
         # 如果未检测到目标，直接退出程序
         if results[0].boxes is None or len(results[0].boxes) == 0:
+            rospy.loginfo("no detection")
             rospy.set_param("det_seg_processing", False)
             return
 
@@ -87,7 +81,6 @@ class DetectSegmentation:
         scores = results[0].boxes.conf.cpu().numpy()
 
         # 语义分割
-        # start_time = rospy.Time.now()
         masks = self.segment(
             image=cv2.cvtColor(image, cv2.COLOR_BGR2RGB),
             xyxy=boxes
@@ -98,6 +91,11 @@ class DetectSegmentation:
         # 将 N 张 H×W 的掩码图转换为 单个 H×W×N 的多通道 Image 消息
         masks_stacked = np.stack(masks, axis=-1)  # 变成 (H, W, N)
 
+        # 测量检测分割的时间
+        end_time = rospy.Time.now()
+        seg_time = (end_time - start_time).to_sec()*1000
+        rospy.loginfo(f"detect+segment time: {seg_time:.1f} ms")
+
         # 发布图像标注信息
         annotation_info = AnnotationInfo()
         annotation_info.header.stamp = time_stamp
@@ -107,10 +105,6 @@ class DetectSegmentation:
         annotation_info.boxes.data = boxes.flatten().tolist()
         self.annotation_info_pub.publish(annotation_info)
 
-        # 测试消息发布到接收的时间
-        current_time = rospy.Time.now()
-        rospy.set_param("/current_time", current_time.to_sec()) # 以秒级浮点数存储
-
         # 发布掩码信息
         mask_info = MaskInfo()
         mask_info.header.stamp = time_stamp
@@ -119,13 +113,8 @@ class DetectSegmentation:
         mask_info.segmasks = self.cv_bridge.cv2_to_imgmsg(masks_stacked, encoding="passthrough")  # 8 位无符号整数，N 通道
         self.mask_info_pub.publish(mask_info)
 
-        # 测量检测分割的时间
-        end_time = rospy.Time.now()
-        seg_time = (end_time - start_time).to_sec()*1000
-        rospy.loginfo(f"detect+segment time: {seg_time:.1f} ms")
-
-        # # We release the gpu memory
-        # torch.cuda.empty_cache()
+        # We release the gpu memory
+        torch.cuda.empty_cache()
 
         # 将参数服务器里的det_seg_processing设置成False，允许定时器发布新图像
         rospy.set_param("det_seg_processing", False)
