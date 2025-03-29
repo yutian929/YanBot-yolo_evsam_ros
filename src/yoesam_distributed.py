@@ -15,6 +15,7 @@ from efficientvit.sam_model_zoo import create_efficientvit_sam_model
 from efficientvit.models.efficientvit.sam import EfficientViTSamPredictor
 
 from sensor_msgs.msg import Image, CameraInfo
+from std_msgs.msg import Bool
 from yolo_evsam_ros.msg import AnnotationInfo, MaskInfo
 
 class DetectSegmentation:
@@ -35,7 +36,10 @@ class DetectSegmentation:
 
         self.cv_bridge = CvBridge()
 
-        rospy.loginfo("Loading models...")
+        # # 模型加载完成消息 发布者
+        # init_pub = rospy.Publisher("/yolo_evsam_ros_init", Bool, queue_size=1)
+
+        rospy.loginfo("Loading yolo evsam models...")
 
         # Building YOLO-World inference model
         self.yolo_world_model = YOLO(yolo_model_path,task='detect') 
@@ -45,7 +49,10 @@ class DetectSegmentation:
         efficientvit_sam = create_efficientvit_sam_model(sam_model_type, True, sam_model_path).cuda().eval()
         self.sam_predictor = EfficientViTSamPredictor(efficientvit_sam)
 
-        rospy.loginfo("Models are loaded")
+        # init_pub.publish(True)
+        rospy.set_param("/yolo_evsam_ros_init", True)
+        rospy.loginfo("yolo evsam models are loaded")
+        
 
     def det_seg(self, image_msg):
         start_time = rospy.Time.now()
@@ -63,7 +70,7 @@ class DetectSegmentation:
 
         # 检测目标
         self.yolo_world_model.set_classes(class_list)
-        results = self.yolo_world_model.predict(source=image, conf=self.box_threshold)
+        results = self.yolo_world_model.predict(source=image, conf=self.box_threshold, verbose=False)
 
         # 如果未检测到目标，直接退出程序
         if results[0].boxes is None or len(results[0].boxes) == 0:
