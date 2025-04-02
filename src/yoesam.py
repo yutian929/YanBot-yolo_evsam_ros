@@ -97,7 +97,8 @@ class VitDetectionServer(object):
         img, prompt = request.color_image, request.prompt
         img = self.cv_bridge.imgmsg_to_cv2(img)
 
-        class_list = prompt.split(". ")
+        # class_list = prompt.split(". ")
+        class_list = prompt.strip().replace(" ","").split(".")
         # class_list = [item for item in class_list if item]
 
         detections, labels, annotated_frame = self.detect(img, class_list)
